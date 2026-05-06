@@ -1,0 +1,37 @@
+{
+  "name": "swish-analytics-assessment",
+  "version": "1.0.0",
+  "description": "Swish Analytics Fullstack Assessment - Skeleton Project",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "cd server && npm run dev",
+    "client:dev": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "migrate": "cd server && npm run migrate",
+    "seed": "cd server && npm run seed",
+    "start": "npm run migrate && npm run seed && npm run dev",
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:verify": "docker ps | grep swish_mysql || echo 'MySQL container not running. Run: npm run docker:up'",
+    "setup": "npm run docker:up && npx wait-on tcp:localhost:3306 --timeout 30000 && npm run install:all",
+    "verify": "npm run docker:verify && echo 'Checking Node version...' && node --version && echo 'Setup verification complete!'",
+    "format": "prettier --write \"client/src/**/*.{ts,tsx}\" \"server/src/**/*.{ts,tsx}\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"client/src/**/*.{ts,tsx}\" \"server/src/**/*.{ts,tsx}\" \"*.{json,md}\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "prettier": "^3.1.0",
+    "wait-on": "^7.2.0"
+  },
+  "keywords": [
+    "react",
+    "node",
+    "typescript",
+    "mysql",
+    "assessment"
+  ],
+  "author": "Swish Analytics",
+  "license": "MIT"
+}
