@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { MarketTable } from './components/MarketTable';
 import { MarketFilters } from './components/MarketFilters';
 import { MarketStatistics } from './components/MarketStatistics';
 import { MarketTabs } from './components/MarketTabs';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastContainer } from './components/Toast';
 import { useMarkets } from './hooks/useMarkets';
 import { useFilterOptions } from './hooks/useFilterOptions';
+import { useToasts } from './hooks/useToasts';
 import { Filters } from './types';
 import './App.css';
 
@@ -16,12 +19,23 @@ function App() {
     search: ''
   });
 
-  const { markets, loading, error, pendingToggles, fetchMarkets, toggleSuspension } = useMarkets();
-  const filterOptions = useFilterOptions();
+  const { toasts, pushToast, dismissToast } = useToasts();
+
+  // Show toggle failures as a toast — the row reverts behind the scenes,
+  // but without this the user has no clue the click didn't apply.
+  const onTransientError = useCallback(
+    (message: string) => pushToast(message, 'error'),
+    [pushToast]
+  );
+
+  const { markets, loading, error, pendingToggles, fetchMarkets, toggleSuspension } = useMarkets({
+    onTransientError
+  });
+  const { filterOptions, error: filterOptionsError, retry: retryFilterOptions } = useFilterOptions();
 
   useEffect(() => {
-    fetchMarkets(filters);
-  }, [filters]);
+    void fetchMarkets(filters);
+  }, [filters, fetchMarkets]);
 
   const handleFiltersChange = (newFilters: Filters) => {
     setFilters(newFilters);
@@ -33,7 +47,7 @@ function App() {
 
   if (error) {
     return (
-      <div className="error-container">
+      <div className="error-container" role="alert">
         <h3>Error Loading Markets</h3>
         <p>{error}</p>
         <button onClick={() => fetchMarkets(filters)} className="btn btn-primary">
@@ -44,38 +58,51 @@ function App() {
   }
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1 className="app-title">Swish Analytics - Player Markets</h1>
-        <p className="app-subtitle">NBA Player Prop Betting Lines & Market Status</p>
-      </header>
+    <ErrorBoundary>
+      <div className="app-container">
+        <header className="app-header">
+          <h1 className="app-title">Swish Analytics - Player Markets</h1>
+          <p className="app-subtitle">NBA Player Prop Betting Lines & Market Status</p>
+        </header>
 
-      <MarketFilters filters={filters} filterOptions={filterOptions} onFiltersChange={handleFiltersChange} />
+        {filterOptionsError && (
+          <div className="inline-error" role="alert">
+            <span>Could not load filter options.</span>
+            <button onClick={retryFilterOptions} className="btn btn-small btn-primary">
+              Retry
+            </button>
+          </div>
+        )}
 
-      <MarketStatistics markets={markets} loading={loading} />
+        <MarketFilters filters={filters} filterOptions={filterOptions} onFiltersChange={handleFiltersChange} />
 
-      <div className="section-container">
-        <h2 className="section-title">Markets ({markets.length})</h2>
-        <p className="section-description">
-          • <strong>Optimal Line:</strong> Primary betting line from props data
-          <br />• <strong>Low/High Line:</strong> Range of available alternate lines
-          <br />• <strong>Status:</strong> Auto = computed suspension, Manual = user override
-        </p>
+        <MarketStatistics markets={markets} loading={loading} />
+
+        <div className="section-container">
+          <h2 className="section-title">Markets ({markets.length})</h2>
+          <p className="section-description">
+            • <strong>Optimal Line:</strong> Primary betting line from props data
+            <br />• <strong>Low/High Line:</strong> Range of available alternate lines
+            <br />• <strong>Status:</strong> Auto = computed suspension, Manual = user override
+          </p>
+        </div>
+
+        <MarketTabs
+          statTypes={filterOptions.statTypes}
+          activeStatType={filters.statType}
+          onChange={handleStatTypeChange}
+        />
+
+        <MarketTable
+          markets={markets}
+          onToggleSuspension={toggleSuspension}
+          loading={loading}
+          pendingToggles={pendingToggles}
+        />
+
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </div>
-
-      <MarketTabs
-        statTypes={filterOptions.statTypes}
-        activeStatType={filters.statType}
-        onChange={handleStatTypeChange}
-      />
-
-      <MarketTable
-        markets={markets}
-        onToggleSuspension={toggleSuspension}
-        loading={loading}
-        pendingToggles={pendingToggles}
-      />
-    </div>
+    </ErrorBoundary>
   );
 }
 

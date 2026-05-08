@@ -23,15 +23,19 @@ router.get('/filterOptions', async (_req, res) => {
 //   true  -> force suspended
 //   false -> force released
 //   null  -> clear manual override (fall back to computed status)
+// Strict positive-integer guard. parseInt('5abc', 10) returns 5, which would
+// silently accept malformed paths like /api/markets/5abc/suspension. Match
+// only digits and bound to MySQL's INT range so we don't overflow.
+const POSITIVE_INT = /^[1-9]\d*$/;
+const MYSQL_INT_MAX = 2_147_483_647;
+
 router.put('/:id/suspension', async (req, res) => {
   try {
-    const marketId = parseInt(req.params.id, 10);
-    if (!Number.isInteger(marketId) || marketId <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid market id'
-      });
+    const raw = req.params.id;
+    if (!POSITIVE_INT.test(raw) || Number(raw) > MYSQL_INT_MAX) {
+      return res.status(400).json({ success: false, error: 'Invalid market id' });
     }
+    const marketId = Number(raw);
 
     const { suspended } = req.body ?? {};
     if (suspended !== true && suspended !== false && suspended !== null) {
@@ -51,8 +55,17 @@ router.put('/:id/suspension', async (req, res) => {
 
     // Return the freshly-computed market so the client can replace the row
     // without guessing what the post-update suspension status should be.
-    const market = await marketService.getMarketById(marketId);
-    return res.json({ success: true, data: market });
+    // If this read fails after a successful UPDATE we still want to tell the
+    // client the write applied — they can refetch on their own. Sending a
+    // bare 500 here would have them rolling back an update that actually
+    // landed in the database.
+    try {
+      const market = await marketService.getMarketById(marketId);
+      return res.json({ success: true, data: market });
+    } catch (readErr) {
+      console.error('UPDATE applied but follow-up read failed:', readErr);
+      return res.json({ success: true, data: null, warning: 'Update applied but follow-up read failed; please refetch.' });
+    }
   } catch (error) {
     console.error('Error updating manual suspension:', error);
     return res.status(500).json({

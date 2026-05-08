@@ -1,7 +1,52 @@
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { getPool } from '../config/database';
 import { MarketWithDetails } from '../types';
 
 const pool = getPool();
+
+// mysql2 hands DECIMAL columns back as strings to preserve precision. We
+// coerce to JS numbers at the service boundary so the API contract
+// (MarketWithDetails uses `number`) is actually true. Same for the 0/1
+// `is_suspended` integer the SQL `CASE` returns.
+interface RawMarketRow extends RowDataPacket {
+  id: number;
+  player_id: number;
+  stat_type_id: number;
+  line: string | number;
+  market_suspended: number;
+  manual_suspension: number | null;
+  created_at: Date;
+  updated_at: Date;
+  player_name: string;
+  team_nickname: string;
+  team_abbr: string;
+  position: string;
+  stat_type_name: string;
+  low_line: string | number;
+  high_line: string | number;
+  is_suspended: number;
+}
+
+const toNum = (v: string | number): number => (typeof v === 'number' ? v : Number(v));
+
+const hydrateMarket = (row: RawMarketRow): MarketWithDetails => ({
+  id: row.id,
+  player_id: row.player_id,
+  stat_type_id: row.stat_type_id,
+  line: toNum(row.line),
+  market_suspended: row.market_suspended,
+  manual_suspension: row.manual_suspension,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+  player_name: row.player_name,
+  team_nickname: row.team_nickname,
+  team_abbr: row.team_abbr,
+  position: row.position,
+  stat_type_name: row.stat_type_name,
+  low_line: toNum(row.low_line),
+  high_line: toNum(row.high_line),
+  is_suspended: Boolean(row.is_suspended)
+});
 
 export interface MarketFilters {
   position?: string;
@@ -110,22 +155,21 @@ export class MarketService {
       sql = `${inner} ORDER BY p.name, st.name`;
     }
 
-    const [rows] = await pool.execute(sql, params);
-    return (rows as any[]).map((row) => ({
-      ...row,
-      is_suspended: Boolean(row.is_suspended)
-    })) as MarketWithDetails[];
+    const [rows] = await pool.execute<RawMarketRow[]>(sql, params);
+    return rows.map(hydrateMarket);
   }
 
   async getFilterOptions(): Promise<FilterOptions> {
-    const [positionRows] = await pool.execute(
+    const [positionRows] = await pool.execute<(RowDataPacket & { position: string })[]>(
       'SELECT DISTINCT position FROM players WHERE position IS NOT NULL ORDER BY position'
     );
-    const [statTypeRows] = await pool.execute('SELECT name FROM stat_types ORDER BY name');
+    const [statTypeRows] = await pool.execute<(RowDataPacket & { name: string })[]>(
+      'SELECT name FROM stat_types ORDER BY name'
+    );
 
     return {
-      positions: (positionRows as { position: string }[]).map((r) => r.position),
-      statTypes: (statTypeRows as { name: string }[]).map((r) => r.name),
+      positions: positionRows.map((r) => r.position),
+      statTypes: statTypeRows.map((r) => r.name),
       suspensionStatuses: ['suspended', 'active']
     };
   }
@@ -133,14 +177,13 @@ export class MarketService {
   async updateManualSuspension(marketId: number, suspended: boolean | null): Promise<boolean> {
     const manualValue = suspended === null ? null : suspended ? 1 : 0;
 
-    const [result] = await pool.execute(
+    const [result] = await pool.execute<ResultSetHeader>(
       `UPDATE markets
          SET manual_suspension = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
       [manualValue, marketId]
     );
-    const { affectedRows } = result as { affectedRows: number };
-    return affectedRows > 0;
+    return result.affectedRows > 0;
   }
 
   // Re-runs the enriched query for a single market. Used by the PUT
@@ -148,9 +191,9 @@ export class MarketService {
   // have to approximate the post-update suspension status.
   async getMarketById(marketId: number): Promise<MarketWithDetails | null> {
     const sql = `${ENRICHED_MARKETS_BASE} WHERE m.id = ?`;
-    const [rows] = await pool.execute(sql, [marketId]);
-    const list = rows as any[];
-    if (list.length === 0) return null;
-    return { ...list[0], is_suspended: Boolean(list[0].is_suspended) } as MarketWithDetails;
+    const [rows] = await pool.execute<RawMarketRow[]>(sql, [marketId]);
+    const first = rows[0];
+    if (!first) return null;
+    return hydrateMarket(first);
   }
 }
