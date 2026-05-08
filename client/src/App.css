@@ -151,6 +151,55 @@
 }
 
 /* ==========================================================================
+   Stat-Type Tabs
+   ========================================================================== */
+
+.tabs-container {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #dee2e6;
+  margin-bottom: 0;
+  flex-wrap: wrap;
+}
+
+.tab {
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #555;
+  text-transform: capitalize;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  border-radius: 4px 4px 0 0;
+}
+
+.tab:hover {
+  color: #2196f3;
+  background-color: #f0f7ff;
+}
+
+.tab-active {
+  color: #2196f3;
+  border-bottom-color: #2196f3;
+  font-weight: bold;
+}
+
+.tab-active:hover {
+  background-color: transparent;
+}
+
+/* When the tabs sit directly above the table, drop the table's top radius
+   so the visual stack is one continuous unit. */
+.tabs-container + .table-container .table {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* ==========================================================================
    Tables
    ========================================================================== */
 

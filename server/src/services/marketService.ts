@@ -142,4 +142,15 @@ export class MarketService {
     const { affectedRows } = result as { affectedRows: number };
     return affectedRows > 0;
   }
+
+  // Re-runs the enriched query for a single market. Used by the PUT
+  // endpoint to return the freshly-computed row so the client doesn't
+  // have to approximate the post-update suspension status.
+  async getMarketById(marketId: number): Promise<MarketWithDetails | null> {
+    const sql = `${ENRICHED_MARKETS_BASE} WHERE m.id = ?`;
+    const [rows] = await pool.execute(sql, [marketId]);
+    const list = rows as any[];
+    if (list.length === 0) return null;
+    return { ...list[0], is_suspended: Boolean(list[0].is_suspended) } as MarketWithDetails;
+  }
 }

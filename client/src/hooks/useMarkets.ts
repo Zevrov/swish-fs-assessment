@@ -51,41 +51,41 @@ export const useMarkets = () => {
     const market = markets.find((m) => m.id === marketId);
     if (!market) return;
 
+    // Decide the new manual_suspension value. Setting an override is the
+    // inverse of the current effective state; if there's already an override
+    // active, the click clears it.
     let newManualSuspension: number | null;
-    let newSuspendedState: boolean;
-
     if (market.manual_suspension !== null) {
-      // Remove the manual override. We don't know the true computed status
-      // without re-asking the server — fall back to the raw flag as an
-      // approximation; the next fetch will reconcile.
       newManualSuspension = null;
-      newSuspendedState = market.market_suspended === 1;
     } else {
       newManualSuspension = market.is_suspended ? 0 : 1;
-      newSuspendedState = !market.is_suspended;
     }
 
+    // Optimistic update: when *setting* an override we know the answer
+    // exactly (manual values win). When *clearing* an override we keep the
+    // current row visible and let the server's response replace it — this
+    // avoids the rule-2/rule-3 approximation that used to lie until the
+    // next list refresh.
+    const optimistic =
+      newManualSuspension === null
+        ? market
+        : { ...market, manual_suspension: newManualSuspension, is_suspended: Boolean(newManualSuspension) };
+
     setPending(marketId, true);
-    setMarkets((prev) =>
-      prev.map((m) =>
-        m.id === marketId
-          ? { ...m, manual_suspension: newManualSuspension, is_suspended: newSuspendedState }
-          : m
-      )
-    );
+    if (optimistic !== market) {
+      setMarkets((prev) => prev.map((m) => (m.id === marketId ? optimistic : m)));
+    }
 
     try {
       const suspendedPayload = newManualSuspension === null ? null : Boolean(newManualSuspension);
-      await api.updateManualSuspension(marketId, suspendedPayload);
+      const updated = await api.updateManualSuspension(marketId, suspendedPayload);
+      // Replace the row with the server-computed truth — covers the clear-
+      // override case (where rules 2/3 may flip is_suspended back to true)
+      // and reconciles any drift from the optimistic guess.
+      setMarkets((prev) => prev.map((m) => (m.id === marketId ? { ...m, ...updated } : m)));
     } catch (err) {
       console.error('Error updating manual override:', err);
-      setMarkets((prev) =>
-        prev.map((m) =>
-          m.id === marketId
-            ? { ...m, manual_suspension: market.manual_suspension, is_suspended: market.is_suspended }
-            : m
-        )
-      );
+      setMarkets((prev) => prev.map((m) => (m.id === marketId ? market : m)));
     } finally {
       setPending(marketId, false);
     }

@@ -49,7 +49,10 @@ router.put('/:id/suspension', async (req, res) => {
       });
     }
 
-    return res.json({ success: true });
+    // Return the freshly-computed market so the client can replace the row
+    // without guessing what the post-update suspension status should be.
+    const market = await marketService.getMarketById(marketId);
+    return res.json({ success: true, data: market });
   } catch (error) {
     console.error('Error updating manual suspension:', error);
     return res.status(500).json({

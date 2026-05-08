@@ -1,39 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Filters, FilterOptions } from '../types';
-import { api } from '../services/api';
 
 interface Props {
   filters: Filters;
+  filterOptions: FilterOptions;
   onFiltersChange: (filters: Filters) => void;
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-export const MarketFilters: React.FC<Props> = ({ filters, onFiltersChange }) => {
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
-    positions: [],
-    statTypes: [],
-    suspensionStatuses: []
-  });
-
+export const MarketFilters: React.FC<Props> = ({ filters, filterOptions, onFiltersChange }) => {
   // Local input state lets the field feel instant while we debounce the
   // upstream filter update (and the fetch it triggers).
   const [searchInput, setSearchInput] = useState(filters.search);
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
-
-  useEffect(() => {
-    const loadFilterOptions = async () => {
-      try {
-        const options = await api.getFilterOptions();
-        setFilterOptions(options);
-      } catch (error) {
-        console.error('Error loading filter options:', error);
-      }
-    };
-
-    loadFilterOptions();
-  }, []);
 
   // Keep the input in sync if the parent clears/replaces filters externally.
   useEffect(() => {
@@ -97,22 +78,7 @@ export const MarketFilters: React.FC<Props> = ({ filters, onFiltersChange }) => 
           </select>
         </div>
 
-        {/* Stat Type Filter */}
-        <div className="filter-group">
-          <label className="form-label">Stat Type:</label>
-          <select
-            value={filters.statType}
-            onChange={(e) => handleFilterChange('statType', e.target.value)}
-            className="form-select"
-          >
-            <option value="">All Stats</option>
-            {filterOptions.statTypes.map((statType) => (
-              <option key={statType} value={statType}>
-                {statType}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Stat Type is now driven by MarketTabs above the table. */}
 
         <div className="filter-group">
           <label className="form-label">Market Status:</label>

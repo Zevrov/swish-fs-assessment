@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { MarketTable } from './components/MarketTable';
 import { MarketFilters } from './components/MarketFilters';
 import { MarketStatistics } from './components/MarketStatistics';
+import { MarketTabs } from './components/MarketTabs';
 import { useMarkets } from './hooks/useMarkets';
+import { useFilterOptions } from './hooks/useFilterOptions';
 import { Filters } from './types';
 import './App.css';
 
@@ -15,6 +17,7 @@ function App() {
   });
 
   const { markets, loading, error, pendingToggles, fetchMarkets, toggleSuspension } = useMarkets();
+  const filterOptions = useFilterOptions();
 
   useEffect(() => {
     fetchMarkets(filters);
@@ -22,6 +25,10 @@ function App() {
 
   const handleFiltersChange = (newFilters: Filters) => {
     setFilters(newFilters);
+  };
+
+  const handleStatTypeChange = (statType: string) => {
+    setFilters((prev) => ({ ...prev, statType }));
   };
 
   if (error) {
@@ -43,7 +50,7 @@ function App() {
         <p className="app-subtitle">NBA Player Prop Betting Lines & Market Status</p>
       </header>
 
-      <MarketFilters filters={filters} onFiltersChange={handleFiltersChange} />
+      <MarketFilters filters={filters} filterOptions={filterOptions} onFiltersChange={handleFiltersChange} />
 
       <MarketStatistics markets={markets} loading={loading} />
 
@@ -55,6 +62,12 @@ function App() {
           <br />• <strong>Status:</strong> Auto = computed suspension, Manual = user override
         </p>
       </div>
+
+      <MarketTabs
+        statTypes={filterOptions.statTypes}
+        activeStatType={filters.statType}
+        onChange={handleStatTypeChange}
+      />
 
       <MarketTable
         markets={markets}

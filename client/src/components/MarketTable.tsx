@@ -9,11 +9,14 @@ interface Props {
 }
 
 export const MarketTable: React.FC<Props> = ({ markets, onToggleSuspension, loading, pendingToggles }) => {
-  if (loading) {
+  // Only show the full loading screen on the first load — keeping previous
+  // rows visible during a refetch prevents the page from collapsing and
+  // jumping the scroll position back to the top.
+  if (loading && markets.length === 0) {
     return <div className="loading-container">Loading markets...</div>;
   }
 
-  if (markets.length === 0) {
+  if (!loading && markets.length === 0) {
     return <div className="empty-state">No markets found.</div>;
   }
 

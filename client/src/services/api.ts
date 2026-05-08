@@ -14,10 +14,10 @@ export const api = {
     return response.data.data;
   },
 
-  async updateManualSuspension(marketId: number, suspended: boolean | null): Promise<boolean> {
+  async updateManualSuspension(marketId: number, suspended: boolean | null): Promise<Market> {
     const response = await axios.put(`${API_BASE_URL}/markets/${marketId}/suspension`, {
       suspended
     });
-    return response.data.success;
+    return response.data.data as Market;
   }
 };
